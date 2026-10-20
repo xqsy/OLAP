@@ -69,6 +69,8 @@ H1/H2 не содержат журнал смены типа. Начальный
 
 **Главная метрика: количество состоявшихся бронирований за весь доступный период.**
 
+Эталонный запрос сохранён в `sql/canonical_metric.sql`:
+
 ```sql
 SELECT COUNT(*) AS completed_booking_count
 FROM fact_booking

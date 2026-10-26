@@ -1,4 +1,5 @@
 -- Executed by etl/load_duckdb.py in the session containing TEMP raw_booking.
+-- raw_booking contains accepted records; rejected records are logged separately.
 -- NULL expected = informational count; otherwise actual must equal expected.
 WITH checks AS (
     SELECT 'fact_booking rows' AS check_name, count(*) AS actual,
@@ -19,7 +20,7 @@ WITH checks AS (
     FROM raw_booking r GROUP BY r.source_file
     UNION ALL
     SELECT 'dim_date rows', count(*),
-           (SELECT date_diff('day', min(d), max(d)) + 2
+           (SELECT coalesce(date_diff('day', min(d), max(d)) + 2, 1)
             FROM (SELECT arrival_date AS d FROM raw_booking UNION ALL SELECT status_date FROM raw_booking))
     FROM dim_date
     UNION ALL

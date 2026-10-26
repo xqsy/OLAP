@@ -1,7 +1,9 @@
 """Rebuild the booking mart from H1/H2 and save the SQL check results."""
 
 import csv
+import json
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -30,33 +32,94 @@ def normalize(value):
     return None if not value or value.upper() in {"NULL", "NA", "N/A"} else value
 
 
-def prepare_csv(path):
-    """Number CSV records before SQL; equal-valued records remain distinct."""
-    with path.open("w", encoding="utf-8", newline="") as output:
+def validate_row(row):
+    """Validate source values before they can abort the SQL transaction."""
+    if None in row or any(value is None for value in row.values()):
+        raise ValueError("CSV record has a different number of columns than the header")
+    row = {key: normalize(value) for key, value in row.items()}
+    try:
+        arrival = date(int(row["ArrivalDateYear"]), MONTHS[row["ArrivalDateMonth"]],
+                       int(row["ArrivalDateDayOfMonth"]))
+        status = date.fromisoformat(row["ReservationStatusDate"])
+    except (ValueError, TypeError, KeyError, OverflowError) as exc:
+        raise ValueError(f"Invalid or missing booking date: {exc}") from exc
+    if min(arrival, status) < date(2000, 1, 1):
+        raise ValueError("Booking dates must be on or after 2000-01-01")
+    if row["ReservationStatus"] not in {"Check-Out", "Canceled", "No-Show"}:
+        raise ValueError("ReservationStatus must be Check-Out, Canceled or No-Show")
+    for field in ("IsCanceled", "LeadTime", "StaysInWeekendNights", "StaysInWeekNights",
+                  "Adults", "Children", "Babies"):
+        value = row[field]
+        if value is None and field == "Children":
+            continue
+        try:
+            number = int(value)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"{field}: expected an integer, got {value!r}") from exc
+        maximum = 1 if field == "IsCanceled" else 2147483647
+        if not 0 <= number <= maximum:
+            raise ValueError(f"{field}: value outside 0..{maximum}")
+        row[field] = str(number)
+    if row["ADR"] is not None:
+        try:
+            with localcontext() as ctx:
+                ctx.prec = 32
+                amount = Decimal(row["ADR"])
+                if not amount.is_finite() or abs(amount) >= Decimal("10000000000000000"):
+                    raise InvalidOperation
+                amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if abs(amount) >= Decimal("10000000000000000"):
+                    raise InvalidOperation
+        except InvalidOperation as exc:
+            raise ValueError("ADR: value does not fit DECIMAL(18,2)") from exc
+        row["ADR"] = str(amount)
+    return arrival, status, row
+
+
+def prepare_csv(path, rejected_path):
+    """Keep source record numbers, stream rejects to disk, return per-file counts."""
+    counts = []
+    with path.open("w", encoding="utf-8", newline="") as output, rejected_path.open(
+            "w", encoding="utf-8", newline="") as rejected:
         writer = csv.writer(output)
+        rejects = csv.writer(rejected)
+        rejects.writerow(["source_file", "source_row_number", "source_line_number", "reason", "raw_record"])
         writer.writerow(["hotel_id", "hotel_code", "source_file", "source_row_number",
                          "arrival_date", "status_date", *FIELDS])
         for hotel_id in (1, 2):
             source = ROOT / "data" / "raw" / f"H{hotel_id}.csv"
             with source.open(encoding="utf-8-sig", newline="") as handle:
-                reader = csv.DictReader(handle)
+                reader = csv.DictReader(handle, strict=True)
                 required = set(FIELDS.values()) | {
                     "ArrivalDateYear", "ArrivalDateMonth", "ArrivalDateDayOfMonth",
                     "ReservationStatusDate",
                 }
                 if not required.issubset(reader.fieldnames or []):
                     raise ValueError(f"Missing columns in {source}")
-                for row_number, row in enumerate(reader, 1):
-                    row = {key: normalize(value) for key, value in row.items()}
-                    parts = [row[key] for key in (
-                        "ArrivalDateYear", "ArrivalDateMonth", "ArrivalDateDayOfMonth")]
-                    arrival = (date(int(parts[0]), MONTHS[parts[1]], int(parts[2]))
-                               if all(parts) else None)
-                    status = row["ReservationStatusDate"]
-                    if status:
-                        status = date.fromisoformat(status)
-                    writer.writerow([hotel_id, f"H{hotel_id}", source.name, row_number,
-                                     arrival, status, *[row[key] for key in FIELDS.values()]])
+                total = accepted = 0
+                while True:
+                    line_number = reader.reader.line_num + 1
+                    row = None
+                    try:
+                        row = next(reader)
+                    except StopIteration:
+                        break
+                    except csv.Error as exc:
+                        total += 1
+                        rejects.writerow([source.name, total, line_number, str(exc), ""])
+                        continue
+                    total += 1
+                    try:
+                        arrival, status, clean = validate_row(row)
+                    except ValueError as exc:
+                        rejects.writerow([source.name, total, line_number, str(exc),
+                                          json.dumps(row, ensure_ascii=False)])
+                        continue
+                    writer.writerow([hotel_id, f"H{hotel_id}", source.name, total,
+                                     arrival, status, *[clean[key] for key in FIELDS.values()]])
+                    accepted += 1
+                counts.append((source.name, total, accepted, total - accepted))
+    return counts
 
 
 LOAD_SQL = """
@@ -124,10 +187,11 @@ JOIN dim_room_type ar ON ar.hotel_id = h.hotel_id
 """
 
 
-def main():
+def load():
     with TemporaryDirectory(prefix="olap_duckdb_") as temporary:
         normalized = Path(temporary) / "normalized.csv"
-        prepare_csv(normalized)
+        rejected_path = REPORT.with_name("rejected_duckdb.csv")
+        counts = prepare_csv(normalized, rejected_path)
         with duckdb.connect(str(DATABASE)) as con:
             con.execute("""
                 CREATE TEMP TABLE raw_booking AS
@@ -150,11 +214,18 @@ def main():
                 run_time = datetime.now(timezone(timedelta(hours=3))).isoformat(timespec="seconds")
                 lines = ["DuckDB booking mart checks", f"Run (UTC+03:00): {run_time}",
                          f"DuckDB: {duckdb.__version__}", "",
-                         f"{'Check':<46} {'Actual':>10} {'Expected':>10}  Result"]
+                         "Source records (read / accepted / rejected):"]
+                lines.extend(f"{name}: {total} / {accepted} / {rejected}"
+                             for name, total, accepted, rejected in counts)
+                lines.extend([f"Rejected records: {rejected_path}", "",
+                              f"{'Check':<46} {'Actual':>10} {'Expected':>10}  Result"])
                 for name, actual, expected in checks:
                     result = "INFO" if expected is None else ("OK" if actual == expected else "FAIL")
                     lines.append(f"{name:<46} {actual:>10} {str(expected) if expected is not None else '-':>10}  {result}")
-                lines.extend(["", "FAIL: transaction rolled back" if failures else "PASS: all checks passed"])
+                lines.extend(["", "FAIL: transaction rolled back" if failures else
+                              "PASS: all checks passed for accepted records"])
+                if any(rejected for _, _, _, rejected in counts):
+                    lines.append("WARNING: rejected source records; see rejected_duckdb.csv")
                 if failures:
                     con.execute("ROLLBACK")
                 else:
@@ -166,6 +237,14 @@ def main():
             print("\n".join(lines))
             if failures:
                 raise SystemExit(1)
+
+
+def main():
+    try:
+        load()
+    except Exception as exc:
+        REPORT.write_text(f"FAIL: load aborted\n{type(exc).__name__}: {exc}\n", encoding="utf-8")
+        raise
 
 
 if __name__ == "__main__":

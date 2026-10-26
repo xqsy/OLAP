@@ -2,5 +2,6 @@
 data/booking.duckdb
 data/booking.duckdb.wal
 data/checks_duckdb.txt
+data/rejected_duckdb.csv
 data/checks_duckdb_repeat.txt
 __pycache__/

@@ -148,7 +148,7 @@ def main():
                 failures = [name for name, actual, expected in checks
                             if expected is not None and actual != expected]
                 run_time = datetime.now(timezone(timedelta(hours=3))).isoformat(timespec="seconds")
-                lines = ["DuckDB booking mart checks", f"Run (Europe/Minsk): {run_time}",
+                lines = ["DuckDB booking mart checks", f"Run (UTC+03:00): {run_time}",
                          f"DuckDB: {duckdb.__version__}", "",
                          f"{'Check':<46} {'Actual':>10} {'Expected':>10}  Result"]
                 for name, actual, expected in checks:

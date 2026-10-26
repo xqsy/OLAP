@@ -1,0 +1,78 @@
+Lab 05: two consecutive DuckDB loads
+Checked: 2026-10-26T15:53:07+03:00
+
+RUN 1: python etl/load_duckdb.py
+DuckDB booking mart checks
+Run (UTC+03:00): 2026-10-26T15:53:16+03:00
+DuckDB: 1.5.5
+
+Check                                              Actual   Expected  Result
+NULL children preserved                                 4          4  OK
+completed bookings (Check-Out)                      75166      75166  OK
+dim_channel rows                                       27         27  OK
+dim_country rows                                      178        178  OK
+dim_date rows                                        1065       1065  OK
+dim_hotel rows                                          3          3  OK
+dim_room_type rows                                     23         23  OK
+dimension rows with NULL primary keys                   0          0  OK
+duplicate booking IDs                                   0          0  OK
+fact rows with NULL keys                                0          0  OK
+fact rows with NULL required values                     0          0  OK
+fact rows with invalid numeric ranges                   0          0  OK
+fact rows with invalid status                           0          0  OK
+fact rows with missing dimension references             0          0  OK
+fact_booking rows                                  119390     119390  OK
+hotel version outside arrival date                      0          0  OK
+overlapping hotel versions                              0          0  OK
+raw rows with missing or old dates                      0          0  OK
+room types from a different hotel                       0          0  OK
+source H1.csv Check-Out                             28938      28938  OK
+source H1.csv rows                                  40060      40060  OK
+source H2.csv Check-Out                             46228      46228  OK
+source H2.csv rows                                  79330      79330  OK
+unknown country bookings                              488        488  OK
+
+PASS: all checks passed
+
+Exit code: 0
+
+Verified after run 1: fact_booking=119390; completed_booking_count=75166
+
+RUN 2: python etl/load_duckdb.py
+DuckDB booking mart checks
+Run (UTC+03:00): 2026-10-26T15:53:22+03:00
+DuckDB: 1.5.5
+
+Check                                              Actual   Expected  Result
+NULL children preserved                                 4          4  OK
+completed bookings (Check-Out)                      75166      75166  OK
+dim_channel rows                                       27         27  OK
+dim_country rows                                      178        178  OK
+dim_date rows                                        1065       1065  OK
+dim_hotel rows                                          3          3  OK
+dim_room_type rows                                     23         23  OK
+dimension rows with NULL primary keys                   0          0  OK
+duplicate booking IDs                                   0          0  OK
+fact rows with NULL keys                                0          0  OK
+fact rows with NULL required values                     0          0  OK
+fact rows with invalid numeric ranges                   0          0  OK
+fact rows with invalid status                           0          0  OK
+fact rows with missing dimension references             0          0  OK
+fact_booking rows                                  119390     119390  OK
+hotel version outside arrival date                      0          0  OK
+overlapping hotel versions                              0          0  OK
+raw rows with missing or old dates                      0          0  OK
+room types from a different hotel                       0          0  OK
+source H1.csv Check-Out                             28938      28938  OK
+source H1.csv rows                                  40060      40060  OK
+source H2.csv Check-Out                             46228      46228  OK
+source H2.csv rows                                  79330      79330  OK
+unknown country bookings                              488        488  OK
+
+PASS: all checks passed
+
+Exit code: 0
+
+Verified after run 2: fact_booking=119390; completed_booking_count=75166
+
+PASS: both runs match; fact_booking=119390; completed_booking_count=75166

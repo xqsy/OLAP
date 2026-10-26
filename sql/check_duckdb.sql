@@ -1,4 +1,4 @@
--- Executed by scripts/load_duckdb.py in the session containing TEMP raw_booking.
+-- Executed by etl/load_duckdb.py in the session containing TEMP raw_booking.
 -- NULL expected = informational count; otherwise actual must equal expected.
 WITH checks AS (
     SELECT 'fact_booking rows' AS check_name, count(*) AS actual,
@@ -46,6 +46,22 @@ WITH checks AS (
     WHERE booking_id IS NULL OR hotel_sk IS NULL OR arrival_date_id IS NULL OR status_date_id IS NULL
        OR country_id IS NULL OR channel_id IS NULL
        OR reserved_room_type_id IS NULL OR assigned_room_type_id IS NULL
+    UNION ALL
+    SELECT 'fact rows with NULL required values', count(*), 0 FROM fact_booking
+    WHERE reservation_status IS NULL OR is_canceled IS NULL OR lead_time IS NULL
+       OR stays_in_weekend_nights IS NULL OR stays_in_week_nights IS NULL
+       OR adults IS NULL OR babies IS NULL
+    UNION ALL
+    SELECT 'fact rows with invalid numeric ranges', count(*), 0 FROM fact_booking
+    WHERE lead_time < 0 OR stays_in_weekend_nights < 0 OR stays_in_week_nights < 0
+       OR adults < 0 OR children < 0 OR babies < 0
+    UNION ALL
+    SELECT 'fact rows with invalid status', count(*), 0 FROM fact_booking
+    WHERE reservation_status NOT IN ('Check-Out', 'Canceled', 'No-Show')
+    UNION ALL
+    SELECT 'raw rows with missing or old dates', count(*), 0 FROM raw_booking
+    WHERE arrival_date IS NULL OR status_date IS NULL
+       OR arrival_date < DATE '2000-01-01' OR status_date < DATE '2000-01-01'
     UNION ALL
     SELECT 'dimension rows with NULL primary keys',
            (SELECT count(*) FROM dim_date WHERE date_id IS NULL)

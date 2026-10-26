@@ -1,4 +1,4 @@
-# Generated local DuckDB database; recreate with scripts/load_duckdb.py.
+# Generated local DuckDB database; recreate with etl/load_duckdb.py.
 data/booking.duckdb
 data/booking.duckdb.wal
 data/checks_duckdb.txt

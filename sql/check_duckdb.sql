@@ -44,7 +44,7 @@ WITH checks AS (
     FROM dim_room_type
     UNION ALL
     SELECT 'fact rows with NULL keys', count(*), 0 FROM fact_booking
-    WHERE booking_id IS NULL OR hotel_sk IS NULL OR arrival_date_id IS NULL OR status_date_id IS NULL
+    WHERE booking_id IS NULL OR hotel_id IS NULL OR arrival_date_id IS NULL OR status_date_id IS NULL
        OR country_id IS NULL OR channel_id IS NULL
        OR reserved_room_type_id IS NULL OR assigned_room_type_id IS NULL
     UNION ALL
@@ -66,38 +66,28 @@ WITH checks AS (
     UNION ALL
     SELECT 'dimension rows with NULL primary keys',
            (SELECT count(*) FROM dim_date WHERE date_id IS NULL)
-         + (SELECT count(*) FROM dim_hotel WHERE hotel_sk IS NULL)
+         + (SELECT count(*) FROM dim_hotel WHERE hotel_id IS NULL)
          + (SELECT count(*) FROM dim_country WHERE country_id IS NULL)
          + (SELECT count(*) FROM dim_channel WHERE channel_id IS NULL)
          + (SELECT count(*) FROM dim_room_type WHERE room_type_id IS NULL), 0
     UNION ALL
     SELECT 'fact rows with missing dimension references', count(*), 0
     FROM fact_booking f
-    LEFT JOIN dim_hotel h ON f.hotel_sk = h.hotel_sk
+    LEFT JOIN dim_hotel h ON f.hotel_id = h.hotel_id
     LEFT JOIN dim_date a ON f.arrival_date_id = a.date_id
     LEFT JOIN dim_date s ON f.status_date_id = s.date_id
     LEFT JOIN dim_country c ON f.country_id = c.country_id
     LEFT JOIN dim_channel ch ON f.channel_id = ch.channel_id
     LEFT JOIN dim_room_type r ON f.reserved_room_type_id = r.room_type_id
     LEFT JOIN dim_room_type ar ON f.assigned_room_type_id = ar.room_type_id
-    WHERE h.hotel_sk IS NULL OR a.date_id IS NULL OR s.date_id IS NULL OR c.country_id IS NULL
+    WHERE h.hotel_id IS NULL OR a.date_id IS NULL OR s.date_id IS NULL OR c.country_id IS NULL
        OR ch.channel_id IS NULL OR r.room_type_id IS NULL OR ar.room_type_id IS NULL
     UNION ALL
     SELECT 'room types from a different hotel', count(*), 0
-    FROM fact_booking f JOIN dim_hotel h USING (hotel_sk)
+    FROM fact_booking f JOIN dim_hotel h USING (hotel_id)
     JOIN dim_room_type r ON r.room_type_id = f.reserved_room_type_id
     JOIN dim_room_type a ON a.room_type_id = f.assigned_room_type_id
     WHERE r.hotel_id <> h.hotel_id OR a.hotel_id <> h.hotel_id
-    UNION ALL
-    SELECT 'overlapping hotel versions', count(*), 0
-    FROM dim_hotel a JOIN dim_hotel b ON a.hotel_id = b.hotel_id AND a.hotel_sk < b.hotel_sk
-    WHERE (b.valid_to IS NULL OR a.valid_from < b.valid_to)
-      AND (a.valid_to IS NULL OR b.valid_from < a.valid_to)
-    UNION ALL
-    SELECT 'hotel version outside arrival date', count(*), 0
-    FROM fact_booking f JOIN dim_hotel h USING (hotel_sk)
-    JOIN dim_date d ON d.date_id = f.arrival_date_id
-    WHERE d.full_date < h.valid_from OR d.full_date >= h.valid_to
     UNION ALL
     SELECT 'duplicate booking IDs', count(*) - count(DISTINCT booking_id), 0 FROM fact_booking
     UNION ALL

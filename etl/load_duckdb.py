@@ -134,12 +134,11 @@ FROM generate_series(
                          UNION ALL SELECT status_date FROM raw_booking)),
     INTERVAL 1 DAY) AS calendar(d);
 
-INSERT INTO dim_hotel VALUES (0, 0, 'UNKNOWN', 'UNKNOWN', DATE '0001-01-01', NULL, true);
--- There is no source history: initial type applies to the whole source period.
+INSERT INTO dim_hotel VALUES (0, 'UNKNOWN', 'UNKNOWN');
+-- SCD1 policy: one row per hotel; the type comes from the source file.
 INSERT INTO dim_hotel
-SELECT hotel_id, hotel_id, hotel_code,
-       CASE hotel_id WHEN 1 THEN 'Resort Hotel' ELSE 'City Hotel' END,
-       coalesce(min(arrival_date), DATE '0001-01-01'), NULL, true
+SELECT hotel_id, hotel_code,
+       CASE hotel_id WHEN 1 THEN 'Resort Hotel' ELSE 'City Hotel' END
 FROM raw_booking GROUP BY hotel_id, hotel_code;
 
 INSERT INTO dim_country VALUES (0, 'UNKNOWN');
@@ -164,7 +163,7 @@ FROM (SELECT hotel_id, coalesce(reserved_room_type, 'UNKNOWN') AS room_type_code
       UNION SELECT 0, 'UNKNOWN');
 
 INSERT INTO fact_booking
-SELECT r.hotel_code || ':' || r.source_row_number, h.hotel_sk,
+SELECT r.hotel_code || ':' || r.source_row_number, h.hotel_id,
        coalesce(year(r.arrival_date)*10000 + month(r.arrival_date)*100 + day(r.arrival_date), 0),
        coalesce(year(r.status_date)*10000 + month(r.status_date)*100 + day(r.status_date), 0),
        c.country_id, ch.channel_id, rr.room_type_id, ar.room_type_id,
@@ -174,9 +173,6 @@ SELECT r.hotel_code || ':' || r.source_row_number, h.hotel_sk,
        r.source_file, r.source_row_number
 FROM raw_booking r
 JOIN dim_hotel h ON r.hotel_id = h.hotel_id
-    AND ((r.arrival_date IS NULL AND h.is_current)
-         OR (r.arrival_date >= h.valid_from
-             AND (r.arrival_date < h.valid_to OR h.valid_to IS NULL)))
 JOIN dim_country c ON c.country_code = coalesce(r.country_code, 'UNKNOWN')
 JOIN dim_channel ch ON ch.market_segment = coalesce(r.market_segment, 'UNKNOWN')
     AND ch.distribution_channel = coalesce(r.distribution_channel, 'UNKNOWN')

@@ -7,7 +7,7 @@ SELECT
     COUNT(*) AS completed_booking_count
 FROM fact_booking AS f
 JOIN dim_date AS d ON f.arrival_date_id = d.date_id
-JOIN dim_hotel AS h ON f.hotel_sk = h.hotel_sk
+JOIN dim_hotel AS h ON f.hotel_id = h.hotel_id
 WHERE f.reservation_status = 'Check-Out'
 GROUP BY d.year, d.month, h.hotel_code
 ORDER BY d.year, d.month, h.hotel_code;

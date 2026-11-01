@@ -9,16 +9,9 @@ CREATE TABLE dim_date (
 );
 
 CREATE TABLE dim_hotel (
-    hotel_sk INTEGER PRIMARY KEY,
-    hotel_id INTEGER NOT NULL,
-    hotel_code VARCHAR NOT NULL,
-    hotel_type VARCHAR NOT NULL,
-    valid_from DATE NOT NULL,
-    valid_to DATE,
-    is_current BOOLEAN NOT NULL,
-    UNIQUE (hotel_id, valid_from),
-    CHECK (valid_to IS NULL OR valid_from < valid_to),
-    CHECK (is_current = (valid_to IS NULL))
+    hotel_id INTEGER PRIMARY KEY,
+    hotel_code VARCHAR NOT NULL UNIQUE,
+    hotel_type VARCHAR NOT NULL
 );
 
 CREATE TABLE dim_country (
@@ -42,7 +35,7 @@ CREATE TABLE dim_room_type (
 
 CREATE TABLE fact_booking (
     booking_id VARCHAR PRIMARY KEY,
-    hotel_sk INTEGER NOT NULL REFERENCES dim_hotel(hotel_sk),
+    hotel_id INTEGER NOT NULL REFERENCES dim_hotel(hotel_id),
     arrival_date_id INTEGER NOT NULL REFERENCES dim_date(date_id),
     status_date_id INTEGER NOT NULL REFERENCES dim_date(date_id),
     country_id INTEGER NOT NULL REFERENCES dim_country(country_id),

@@ -1,4 +1,4 @@
-# Витрина бронирований в DuckDB
+# Витрина бронирований в DuckDB и ClickHouse
 
 Одна строка `fact_booking` = одно бронирование, представленное отдельной записью
 фиксированного исходного CSV. Модель описана в [passport.md](passport.md)
@@ -59,17 +59,7 @@ python scripts/query_duckdb.py --schema fact_booking
 
 # Отдельный запрос или все запросы SQL-файла
 python scripts/query_duckdb.py --sql "SELECT * FROM dim_hotel"
-python scripts/query_duckdb.py --file sql/analytics.sql --max-rows 100
-```
-
-По умолчанию база открывается только для чтения. Для намеренного изменения
-базы добавьте `--write`. Полный набор параметров: `--help`; другую базу можно
-выбрать через `--database`. Ограничение `--max-rows` относится к отображению,
-а не к вычислению запроса. Результат каждого запроса файла выводится отдельно.
-
-`sql/check_duckdb.sql` требует временную таблицу `raw_booking`, поэтому его
-по-прежнему выполняет загрузчик в своей сессии. Ручные изменения справочников
-через `--write` также будут потеряны при следующей полной загрузке из CSV.
+python scripts/query_duckdb.py --file sql/analytics.sql 
 
 ## Проверки
 
@@ -87,4 +77,45 @@ python scripts/query_duckdb.py --file sql/analytics.sql --max-rows 100
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+## Загрузка в ClickHouse
+
+Нужны запущенный Docker Desktop и готовая `data/booking.duckdb` из раздела
+«Запуск». Дополнительные Python-пакеты сверх `requirements.txt` не нужны:
+загрузчик использует DuckDB и HTTP через стандартную библиотеку Python.
+Из корня проекта:
+
+```powershell
+docker compose up -d clickhouse
+docker compose ps
+Invoke-RestMethod http://localhost:8123/ping
+python etl/load_clickhouse.py
+```
+
+После ответа `Ok.` от `/ping` можно запускать загрузчик. Он создаёт отдельную
+базу `booking_dw`, применяет `sql/ddl_clickhouse.sql` и переносит пять
+справочников и `fact_booking` из DuckDB.
+
+### Почему такой ORDER BY
+
+В `fact_booking` выбран `ORDER BY (arrival_date_id, hotel_id, booking_id)`:
+первый бизнес-вопрос рассматривает состоявшиеся бронирования по месяцам заезда
+и отелям. Дата стоит первой, чтобы при прямом фильтре по диапазону
+`arrival_date_id` сервер мог пропускать ненужные блоки данных; внутри даты строки
+упорядочены по отелю. `booking_id` задаёт порядок внутри сочетания даты и отеля,
+но `ORDER BY` не обеспечивает уникальность строк. Для небольших справочников
+достаточно порядка по их идентификаторам.
+
+### Повторная загрузка и сверка
+
+Каждый запуск делает полный refresh: сначала `TRUNCATE` всех шести таблиц
+витрины в целевой базе, затем загрузка из DuckDB.
+
+После загрузки скрипт сравнивает количество строк каждой таблицы и результат
+`sql/canonical_metric.sql` с DuckDB. Главная метрика — количество состоявшихся
+бронирований (`Check-Out`), поэтому дополнительно сверяется сумма индикаторов
+`CASE WHEN reservation_status = 'Check-Out' THEN 1 ELSE 0 END`
+
+Результаты двух последовательных запусков сохранены в `etl/lab07_runs.txt`
+
 

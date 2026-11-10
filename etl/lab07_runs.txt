@@ -1,0 +1,66 @@
+DuckDB -> ClickHouse booking mart full refresh
+Run (UTC): 2026-11-02T10:22:50+00:00
+Source: D:\surfprojects\OLAP\data\booking.duckdb
+Target database: booking_dw
+ClickHouse version: 24.12.6.70
+Mode: TRUNCATE all six mart tables, then INSERT from DuckDB
+Loaded dim_date: 1065 rows
+Loaded dim_hotel: 3 rows
+Loaded dim_country: 178 rows
+Loaded dim_channel: 27 rows
+Loaded dim_room_type: 23 rows
+Loaded fact_booking: 119390 rows
+
+Check                                        DuckDB   ClickHouse  Result
+dim_date rows                                  1065         1065  OK
+dim_hotel rows                                    3            3  OK
+dim_country rows                                178          178  OK
+dim_channel rows                                 27           27  OK
+dim_room_type rows                               23           23  OK
+fact_booking rows                            119390       119390  OK
+canonical completed bookings                  75166        75166  OK
+sum of completed booking indicators           75166        75166  OK
+duplicate booking IDs                             0            0  OK
+NULL children                                     4            4  OK
+NULL adr                                          0            0  OK
+unknown calendar rows                             1            1  OK
+ClickHouse adr type: Nullable(Decimal(18, 2))  OK
+PASS: all reconciliation checks passed
+DuckDB -> ClickHouse booking mart full refresh
+Run (UTC): 2026-11-02T10:23:52+00:00
+Source: D:\surfprojects\OLAP\data\booking.duckdb
+Target database: booking_dw
+ClickHouse version: 24.12.6.70
+Mode: TRUNCATE all six mart tables, then INSERT from DuckDB
+Loaded dim_date: 1065 rows
+Loaded dim_hotel: 3 rows
+Loaded dim_country: 178 rows
+Loaded dim_channel: 27 rows
+Loaded dim_room_type: 23 rows
+Loaded fact_booking: 119390 rows
+
+Check                                        DuckDB   ClickHouse  Result
+dim_date rows                                  1065         1065  OK
+dim_hotel rows                                    3            3  OK
+dim_country rows                                178          178  OK
+dim_channel rows                                 27           27  OK
+dim_room_type rows                               23           23  OK
+fact_booking rows                            119390       119390  OK
+canonical completed bookings                  75166        75166  OK
+sum of completed booking indicators           75166        75166  OK
+duplicate booking IDs                             0            0  OK
+NULL children                                     4            4  OK
+NULL adr                                          0            0  OK
+unknown calendar rows                             1            1  OK
+ClickHouse adr type: Nullable(Decimal(18, 2))  OK
+PASS: all reconciliation checks passed
+
+Full row-by-row comparison after the second refresh:
+Compared ordered rows and every column; Decimal values compared numerically.
+dim_date: 1065 rows, all column values identical, OK
+dim_hotel: 3 rows, all column values identical, OK
+dim_country: 178 rows, all column values identical, OK
+dim_channel: 27 rows, all column values identical, OK
+dim_room_type: 23 rows, all column values identical, OK
+fact_booking: 119390 rows, all column values identical, OK
+PASS: all six tables match DuckDB row by row

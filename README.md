@@ -59,7 +59,8 @@ python scripts/query_duckdb.py --schema fact_booking
 
 # Отдельный запрос или все запросы SQL-файла
 python scripts/query_duckdb.py --sql "SELECT * FROM dim_hotel"
-python scripts/query_duckdb.py --file sql/analytics.sql 
+python scripts/query_duckdb.py --file sql/analytics.sql
+```
 
 ## Проверки
 
@@ -118,4 +119,12 @@ python etl/load_clickhouse.py
 
 Результаты двух последовательных запусков сохранены в `etl/lab07_runs.txt`
 
+## Запросы ClickHouse для З08
+
+На запущенном сервисе `clickhouse` с загруженной витриной `booking_dw` выполните из корня проекта:
+
+```powershell
+python scripts/query_clickhouse.py --file sql/canonical_metric.sql
+python scripts/query_clickhouse.py --file sql/analytics.sql
+```
 

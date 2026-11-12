@@ -1,0 +1,17 @@
+Lab 10: live Metabase dashboard checks
+Run (UTC+03:00): 2026-11-12T17:14:49+03:00
+Source: ClickHouse booking_dw
+Dashboard: http://localhost:3000/dashboard/2
+SQL widgets: 3; dashboard period filters: 1
+
+all dates; completed_bookings: completed; rows=1; value=75166; OK
+all dates; monthly_bookings: completed; rows=52; OK
+all dates; top_channels: completed; rows=10; OK
+September 2016; completed_bookings: completed; rows=1; value=3372; OK
+September 2016; monthly_bookings: completed; rows=2; OK
+September 2016; top_channels: completed; rows=10; OK
+
+Browser check: three widgets render without query errors.
+Browser check: period September 1-30, 2016 is displayed; metric changes from 75,166 to 3,372.
+Screenshots: z10_dashboard.png, z10_dashboard_september.png
+PASS

@@ -5,4 +5,6 @@ data/checks_duckdb.txt
 data/rejected_duckdb.csv
 data/checks_duckdb_repeat.txt
 data/checks_clickhouse.txt
+data/metabase_local.json
+data/metabase_dashboard.json
 __pycache__/

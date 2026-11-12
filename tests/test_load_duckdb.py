@@ -68,7 +68,10 @@ class LoadTests(unittest.TestCase):
         self.run_load()
         self.assertEqual(self.facts(), facts)
 
-    def test_bad_records_do_not_block_following_valid_record(self):
+    def test_bad_records_stop_load_and_preserve_database(self):
+        self.sources([self.row])
+        self.run_load()
+        original = self.facts()
         changes = [
             {"ReservationStatusDate": "broken"}, {"ArrivalDateMonth": "Unknown"},
             {"Adults": "broken"}, {"Adults": "-1"}, {"Adults": "2147483648"},
@@ -78,17 +81,22 @@ class LoadTests(unittest.TestCase):
         ]
         rows = [dict(self.row, **change) for change in changes]
         self.sources([self.row, *rows, self.row])
-        self.run_load()
-        self.assertEqual([r[0] for r in self.facts()], ["H1:1", "H1:15", "H2:1"])
+        with self.assertRaisesRegex(ValueError, "Rejected source records"):
+            self.run_load()
+        self.assertEqual(self.facts(), original)
         rejects = self.rejects()
         self.assertEqual(len(rejects), len(changes))
         self.assertEqual([int(r["source_row_number"]) for r in rejects], list(range(2, 15)))
         self.assertTrue(all(r["reason"] and r["raw_record"] for r in rejects))
         report = loader.REPORT.read_text()
         self.assertIn("H1.csv: 15 / 2 / 13", report)
-        self.assertIn("WARNING", report)
+        self.assertIn("FAIL", report)
+        self.assertNotIn("PASS", report)
 
     def test_short_extra_and_malformed_csv_records(self):
+        self.sources([self.row])
+        self.run_load()
+        original = self.facts()
         self.sources([self.row] * 4)
         path = self.root / "data/raw/H1.csv"
         lines = path.read_text().splitlines()
@@ -96,8 +104,9 @@ class LoadTests(unittest.TestCase):
         lines[2] += ",extra"
         lines[3] = '"bad"trailing,' + lines[3]
         path.write_text("\n".join(lines) + "\n")
-        self.run_load()
-        self.assertEqual([r[0] for r in self.facts()], ["H1:4", "H2:1"])
+        with self.assertRaisesRegex(ValueError, "Rejected source records"):
+            self.run_load()
+        self.assertEqual(self.facts(), original)
         self.assertEqual(len(self.rejects()), 3)
         self.assertEqual([r["source_line_number"] for r in self.rejects()], ["2", "3", "4"])
 
@@ -105,16 +114,23 @@ class LoadTests(unittest.TestCase):
         self.sources([dict(self.row, Adults="bad")])
         path = self.root / "data/raw/H2.csv"
         path.write_text(path.read_text().replace("Check-Out", "invalid"))
-        self.run_load()
-        self.assertEqual(self.facts(), [])
+        with self.assertRaisesRegex(ValueError, "Rejected source records"):
+            self.run_load()
+        self.assertFalse(loader.DATABASE.exists())
         self.assertEqual(len(self.rejects()), 2)
-        self.assertIn("PASS", loader.REPORT.read_text())
+        self.assertIn("FAIL", loader.REPORT.read_text())
+        self.assertNotIn("PASS", loader.REPORT.read_text())
 
     def test_date_overflow_is_rejected_and_multiline_csv_is_preserved(self):
-        self.sources([dict(self.row, ArrivalDateYear="999999999999999999999"),
-                      dict(self.row, MarketSegment="Direct\nWeb")])
+        self.sources([dict(self.row, MarketSegment="Direct\nWeb")])
         self.run_load()
-        self.assertEqual([r[0] for r in self.facts()], ["H1:2", "H2:1"])
+        original = self.facts()
+        with duckdb.connect(str(loader.DATABASE), read_only=True) as con:
+            self.assertIn(("Direct\nWeb",), con.execute("SELECT market_segment FROM dim_channel").fetchall())
+        self.sources([dict(self.row, ArrivalDateYear="999999999999999999999")])
+        with self.assertRaisesRegex(ValueError, "Rejected source records"):
+            self.run_load()
+        self.assertEqual(self.facts(), original)
         self.assertEqual(len(self.rejects()), 1)
 
     def test_fatal_error_preserves_database_and_replaces_old_pass(self):

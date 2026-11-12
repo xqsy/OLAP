@@ -188,6 +188,15 @@ def load():
         normalized = Path(temporary) / "normalized.csv"
         rejected_path = REPORT.with_name("rejected_duckdb.csv")
         counts = prepare_csv(normalized, rejected_path)
+        if any(rejected for _, _, _, rejected in counts):
+            summary = "; ".join(
+                f"{name}: {total} / {accepted} / {rejected}"
+                for name, total, accepted, rejected in counts
+            )
+            raise ValueError(
+                f"Rejected source records; database unchanged. "
+                f"Read / accepted / rejected: {summary}. See {rejected_path}"
+            )
         with duckdb.connect(str(DATABASE)) as con:
             con.execute("""
                 CREATE TEMP TABLE raw_booking AS
@@ -219,9 +228,7 @@ def load():
                     result = "INFO" if expected is None else ("OK" if actual == expected else "FAIL")
                     lines.append(f"{name:<46} {actual:>10} {str(expected) if expected is not None else '-':>10}  {result}")
                 lines.extend(["", "FAIL: transaction rolled back" if failures else
-                              "PASS: all checks passed for accepted records"])
-                if any(rejected for _, _, _, rejected in counts):
-                    lines.append("WARNING: rejected source records; see rejected_duckdb.csv")
+                              "PASS: all checks passed"])
                 if failures:
                     con.execute("ROLLBACK")
                 else:

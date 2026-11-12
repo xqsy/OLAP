@@ -1,10 +1,14 @@
-Lab 05: two consecutive DuckDB loads
-Checked: 2026-10-26T15:53:07+03:00
+Lab 05: two consecutive DuckDB loads after strict validation fix
 
 RUN 1: python etl/load_duckdb.py
 DuckDB booking mart checks
-Run (UTC+03:00): 2026-10-26T15:53:16+03:00
+Run (UTC+03:00): 2026-11-12T17:05:57+03:00
 DuckDB: 1.5.5
+
+Source records (read / accepted / rejected):
+H1.csv: 40060 / 40060 / 0
+H2.csv: 79330 / 79330 / 0
+Rejected records: D:\Study\OLAP-team\data\rejected_duckdb.csv
 
 Check                                              Actual   Expected  Result
 NULL children preserved                                 4          4  OK
@@ -22,8 +26,6 @@ fact rows with invalid numeric ranges                   0          0  OK
 fact rows with invalid status                           0          0  OK
 fact rows with missing dimension references             0          0  OK
 fact_booking rows                                  119390     119390  OK
-hotel version outside arrival date                      0          0  OK
-overlapping hotel versions                              0          0  OK
 raw rows with missing or old dates                      0          0  OK
 room types from a different hotel                       0          0  OK
 source H1.csv Check-Out                             28938      28938  OK
@@ -34,14 +36,19 @@ unknown country bookings                              488        488  OK
 
 PASS: all checks passed
 
-Exit code: 0
 
-Verified after run 1: fact_booking=119390; completed_booking_count=75166
+Exit code: 0
+Verified: fact_booking=119390; completed_booking_count=75166
 
 RUN 2: python etl/load_duckdb.py
 DuckDB booking mart checks
-Run (UTC+03:00): 2026-10-26T15:53:22+03:00
+Run (UTC+03:00): 2026-11-12T17:06:13+03:00
 DuckDB: 1.5.5
+
+Source records (read / accepted / rejected):
+H1.csv: 40060 / 40060 / 0
+H2.csv: 79330 / 79330 / 0
+Rejected records: D:\Study\OLAP-team\data\rejected_duckdb.csv
 
 Check                                              Actual   Expected  Result
 NULL children preserved                                 4          4  OK
@@ -59,8 +66,6 @@ fact rows with invalid numeric ranges                   0          0  OK
 fact rows with invalid status                           0          0  OK
 fact rows with missing dimension references             0          0  OK
 fact_booking rows                                  119390     119390  OK
-hotel version outside arrival date                      0          0  OK
-overlapping hotel versions                              0          0  OK
 raw rows with missing or old dates                      0          0  OK
 room types from a different hotel                       0          0  OK
 source H1.csv Check-Out                             28938      28938  OK
@@ -71,8 +76,24 @@ unknown country bookings                              488        488  OK
 
 PASS: all checks passed
 
+
 Exit code: 0
+Verified: fact_booking=119390; completed_booking_count=75166
 
-Verified after run 2: fact_booking=119390; completed_booking_count=75166
+Strict rejection and rollback tests:
 
+test_all_records_rejected (test_load_duckdb.LoadTests.test_all_records_rejected) ... ok
+test_bad_records_stop_load_and_preserve_database (test_load_duckdb.LoadTests.test_bad_records_stop_load_and_preserve_database) ... ok
+test_date_overflow_is_rejected_and_multiline_csv_is_preserved (test_load_duckdb.LoadTests.test_date_overflow_is_rejected_and_multiline_csv_is_preserved) ... ok
+test_fatal_error_preserves_database_and_replaces_old_pass (test_load_duckdb.LoadTests.test_fatal_error_preserves_database_and_replaces_old_pass) ... ok
+test_missing_required_header_is_fatal (test_load_duckdb.LoadTests.test_missing_required_header_is_fatal) ... ok
+test_short_extra_and_malformed_csv_records (test_load_duckdb.LoadTests.test_short_extra_and_malformed_csv_records) ... ok
+test_valid_records_preserve_duplicates_nulls_and_negative_adr (test_load_duckdb.LoadTests.test_valid_records_preserve_duplicates_nulls_and_negative_adr) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 3.403s
+
+OK
+
+Exit code: 0
 PASS: both runs match; fact_booking=119390; completed_booking_count=75166

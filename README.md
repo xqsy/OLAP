@@ -27,6 +27,9 @@ python etl/load_duckdb.py
 
 ## Загрузка и повторный запуск
 
+Каждый успешный запуск полностью пересоздаёт пять справочников и факт DuckDB
+в одной транзакции после проверки всего сырья; повтор не добавляет строки к прежним.
+
 `etl/load_duckdb.py` читает CSV стандартным модулем Python `csv`, обрезает
 пробелы, распознаёт пустые строки и маркеры `NULL`, `NA`, `N/A` как пропуски
 (в текущем сырье `NA` встречается в `Children`). Номер записи
@@ -131,4 +134,12 @@ python etl/load_clickhouse.py
 python scripts/query_clickhouse.py --file sql/canonical_metric.sql
 python scripts/query_clickhouse.py --file sql/analytics.sql
 ```
+
+## Дашборд и сверка SQL–BI
+
+Настройка трёх SQL-виджетов и общего фильтра описана в
+[`dashboards/README.md`](dashboards/README.md).
+После создания дашборда выполните `python scripts/reconcile_dashboard.py`.
+Фактический протокол З11 сохраняется в [`notes/z11.md`](notes/z11.md):
+эталон в ClickHouse и карточка сравниваются без фильтра и за сентябрь 2016 года.
 

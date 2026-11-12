@@ -117,6 +117,28 @@ def reconcile(source, target, log):
     return passed and decimal_ok
 
 
+def refresh_summary(target, log):
+    sql = (ROOT / "sql/aggregate_booking_daily.sql").read_text(encoding="utf-8")
+    for statement in sql.split(";"):
+        if statement.strip():
+            target.execute(statement)
+    mismatches = target.scalar((ROOT / "sql/check_aggregate.sql").read_text(encoding="utf-8"))
+    log(f"Daily summary mismatched day/hotel groups: {mismatches}")
+    passed = mismatches == "0"
+    for name, condition in (("all dates", "1"),
+                            ("September 2016", "arrival_date_id >= 20160901 AND arrival_date_id < 20161001")):
+        detail = target.scalar(
+            "SELECT count() FROM fact_booking WHERE reservation_status = 'Check-Out' AND " + condition
+        )
+        summary = target.scalar(
+            "SELECT coalesce(sum(completed_booking_count), 0) FROM agg_booking_daily WHERE " + condition
+        )
+        ok = detail == summary
+        passed = passed and ok
+        log(f"Summary {name}: detail={detail}; summary={summary}; {'OK' if ok else 'FAIL'}")
+    return passed
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--duckdb", type=Path, default=ROOT / "data" / "booking.duckdb")
@@ -154,7 +176,7 @@ def main():
                 target.execute(f"TRUNCATE TABLE {table}")
             for table in TABLES:
                 log(f"Loaded {table}: {copy_table(source, target, table)} rows")
-            if reconcile(source, target, log):
+            if reconcile(source, target, log) and refresh_summary(target, log):
                 log("PASS: all reconciliation checks passed")
                 result = 0
             else:
